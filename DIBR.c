@@ -474,6 +474,6 @@ int main(int argc, char** argv)
 	system(command);
 
 	printf("--------------processing  is  completed-----------------------------  \n");
-	printf("%d %d\n", maxwidth, maxheight);
+	//printf("%d %d\n", maxwidth, maxheight);
 }
 
