@@ -439,6 +439,9 @@ int main(int argc, char** argv)
 	printf("merge time = %f\n", (double)(fi - st) / CLOCKS_PER_SEC);
 
 	int select_cam = 0;  //select  1  as output depth
+	maxdisp = fB / mindepth;
+	mindisp = fB / maxdepth;
+	//printf("%f %f !!!!!!!!!!!!!!!\n", mindepth, maxdepth);
 	for (j = 0; j < maxheight; j++)    //convert float-point range depth into fixed-point disparity depth
 		for (i = 0; i < maxwidth; i++)
 		{
@@ -472,7 +475,5 @@ int main(int argc, char** argv)
 
 	printf("--------------processing  is  completed-----------------------------  \n");
 	printf("%d %d\n", maxwidth, maxheight);
-	getchar();
-
 }
 

@@ -235,8 +235,8 @@ int set_sfm_parameters(float* save_data)
 			//int_save_data[1] = 540;
 			if ((krt_camparam[i].src_width != int_save_data[0]) || (krt_camparam[i].src_height != int_save_data[1]))
 			{
-				//printf("error: sfm calibration image resolution(%d x %d) is not compatible with the loaded "
-				//	"image(%d x %d) for camera %d;\n", int_save_data[0], int_save_data[1], krt_camparam[i].src_width, krt_camparam[i].src_height, i);
+				// printf("error: sfm calibration image resolution(%d x %d) is not compatible with the loaded "
+				// 	"image(%d x %d) for camera %d;\n", int_save_data[0], int_save_data[1], krt_camparam[i].src_width, krt_camparam[i].src_height, i);
 				//return I2R_ERR;
 			}
 
@@ -1475,8 +1475,8 @@ int warp_image_to_novel_view(novel_view_t* nv, cuRef_data_t *curef, cuCam_data_t
 int gen_novel_view(krt_CamParam* ccam, unsigned char* bgra, float* range_img, krt_CamParam *vcam, novel_view_t *nv, float fB, float mindepth, float maxdepth, int s)
 {	//ccam是参考视角的参数, bgra是当前参考视角的RGB图像, range_img是当前参考视角的D图像, vcam是虚拟相机的参数
 	//nv是虚拟视角的各种初始化过参数, fB,min,max是自定义参数, s是参考视角的序列号9,11
-	//I2R_ASSERT(ccam->src_width == vcam->src_width);
-	//I2R_ASSERT(ccam->src_height == vcam->src_height);
+	I2R_ASSERT(ccam->src_width == vcam->src_width);
+	I2R_ASSERT(ccam->src_height == vcam->src_height);
 
 	int width = vcam->src_width, height = vcam->src_height;
 	// -- allocate texture object for bgra data
