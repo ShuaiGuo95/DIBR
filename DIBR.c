@@ -40,7 +40,7 @@ int main(int argc, char** argv)
 	//----------initialize input parameter----------
 	// gs begin change
 	FILE *kp = NULL;
-	kp = fopen("./depth_1004_diff_noresize/resolutions.txt", "r");
+	kp = fopen("./depth_1007/resolutions.txt", "r");
 	int i, j;
 	for (i = 0; i < 12; i++)
 	{
@@ -79,8 +79,8 @@ int main(int argc, char** argv)
 	//selectTwoView(vcam, &cam12[0],&dist[0],&test[0],&flag);
 	//selectTwoView_new(vcam, &cam12[0], &dist[0]);
 	// 可以手动修改值
-	cam12[0] = 5;
-	cam12[1] = 7;
+	cam12[0] = 9;
+	cam12[1] = 11;
 
 	int maxwidth = max(krt_camparam[cam12[0]].src_width, krt_camparam[cam12[1]].src_width);
 	int maxheight = max(krt_camparam[cam12[0]].src_height, krt_camparam[cam12[1]].src_height);
@@ -426,8 +426,6 @@ int main(int argc, char** argv)
 		totaltime = (double)(finish - start) / CLOCKS_PER_SEC;
 		printf("One warp time = %f\n", totaltime);
 		printf("*****************\n");
-
-
 	}
 
 	clock_t st, fi;
@@ -458,20 +456,22 @@ int main(int argc, char** argv)
 	fclose(depth_file_output);
 	fclose(color_file_output);
 
-	char command[100] = "ffmpeg -s ";
+	char command0[100], command1[100], command2[100], command3[100];
 	char cwidth[10], cheight[10], name[10];
-	itoa(maxwidth, cwidth, 10);
-	itoa(maxheight, cheight, 10);
-	itoa(cam12[0] + 1, name, 10);
-
-	strcat(command, cwidth);
-	strcat(command, "x");
-	strcat(command, cheight);
-	strcat(command, " -pix_fmt rgb24 -i ./results/color_100.yuv ./results/");
-	strcat(command, name);
-	strcat(command, ".png -y");
-	printf("%s\n", command);
-	system(command);
+	sprintf(command0, "%s %dx%d %s%d%s %s", "ffmpeg -s", maxwidth, maxheight, "-pix_fmt rgb24 -i ./results/color_100.yuv ./results/", cam12[0] + 1, ".png", "-y");
+	sprintf(command1, "%s %dx%d %s%d%s %s", "ffmpeg -s", maxwidth/3, maxheight/3, "-pix_fmt rgb24 -i ./results/depth_output0.yuv ./results/depth_output0_", cam12[0] + 1, ".png", "-y");
+	sprintf(command2, "%s %dx%d %s%d%s %s", "ffmpeg -s", maxwidth, maxheight, "-pix_fmt rgb24 -i ./results/warp1.yuv ./results/warp1_", cam12[0] + 1, ".png", "-y");
+	sprintf(command3, "%s %dx%d %s%d%s %s", "ffmpeg -s", maxwidth, maxheight, "-pix_fmt rgb24 -i ./results/warp3.yuv ./results/warp3_", cam12[0] + 1, ".png", "-y");
+	/*printf("%s\n", command0);
+	printf("%s\n", command1);
+	printf("%s\n", command2);
+	printf("%s\n", command3);
+	printf("%d %d\n", maxwidth, maxheight);
+	getchar();*/
+	system(command0);
+	/*system(command1);
+	system(command2);
+	system(command3);*/
 
 	printf("--------------processing  is  completed-----------------------------  \n");
 	printf("%d %d\n", maxwidth, maxheight);

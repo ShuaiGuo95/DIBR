@@ -260,8 +260,8 @@ int set_sfm_parameters(float* save_data)
 
 	//gs begin add
 	FILE *fp = NULL, *tp = NULL;
-	fp = fopen("para_cameras1004_diff_noresize.txt", "r");
-	tp = fopen("./depth_1004_diff_noresize/minmaxdepth.txt", "r");
+	fp = fopen("para_cameras1007.txt", "r");
+	tp = fopen("./depth_1007/minmaxdepth.txt", "r");
 	char temps[100];
 	int tempid;
 	for (int m = 0; m < CamNum; m++)
@@ -436,8 +436,8 @@ void label_background_boudary_pixels(float* range_img, novel_pixel_label_t* labe
 			} // -- process vertical gradients
 		}
 }
-// 如果某一点梯度的绝对值大于dthresh且为正，则右侧和下侧edge_radius范围内的点的label标记为novel_pixel_background_boundary；左侧和上侧edge_radius范围内的点的label标记为novel_pixel_foreground_boundary；
-// 如果某一点梯度的绝对值大于dthresh且为负，则右侧和下侧edge_radius范围内的点的label标记为novel_pixel_foreground_boundary；左侧和上侧edge_radius范围内的点的label标记为novel_pixel_background_boundary；
+// 如果某一点梯度的绝对值大于dthresh且为正（距离相比于右侧点来说更近），则右侧和下侧edge_radius范围内的点的label标记为novel_pixel_background_boundary；左侧和上侧edge_radius范围内的点的label标记为novel_pixel_foreground_boundary；
+// 如果某一点梯度的绝对值大于dthresh且为负（距离相比于右侧点来说更远），则右侧和下侧edge_radius范围内的点的label标记为novel_pixel_foreground_boundary；左侧和上侧edge_radius范围内的点的label标记为novel_pixel_background_boundary；
 
 
 void set_main_layer_labels(novel_pixel_label_t* labels, const int width, const int height, novel_pixel_label_t tarL)
@@ -791,14 +791,14 @@ int warp_range_to_novel_view(krt_CamParam* ccam, float* range_img, novel_pixel_l
 	vec3x1_sub(krt_t, ccam->krt_WorldPosition, vcam->krt_WorldPosition); // krt_t = ccam->krt_WorldPosition - vcam->krt_WorldPosition; 
 	matrix_mult_3x3_by_3x1(krt_t, vcam->krt_R, krt_t); //没错, worlposition -> Tw.
 
-													   //matrix_mult_3x3_by_3x1(krt_t, krt_R, ccam->krt_WorldPosition);
-													   //vec3x1_sub(krt_t, krt_t, vcam->krt_WorldPosition);
-													   //gs end change
+	//matrix_mult_3x3_by_3x1(krt_t, krt_R, ccam->krt_WorldPosition);
+	//vec3x1_sub(krt_t, krt_t, vcam->krt_WorldPosition);
+	//gs end change
 
-													   // krt_t = 虚拟视角的旋转矩阵 * krt_t
-													   // 对于从camera到novel，xv = Rvc * xc + Tvc = Rvc * xc + Rvw*Twc - Rvw*Twv = Rvc *xc + Rvw*(Twc-Twv) ？？？
-													   //   krt_t = Rvw*(Twc-Twv)
-													   //   krt_R = Rvc
+	// krt_t = 虚拟视角的旋转矩阵 * krt_t
+	// 对于从camera到novel，xv = Rvc * xc + Tvc = Rvc * xc + Rvw*Twc - Rvw*Twv = Rvc *xc + Rvw*(Twc-Twv) ？？？
+	//   krt_t = Rvw*(Twc-Twv)
+	//   krt_R = Rvc
 
 	for (int i = 0; i < height; i++)
 	{
@@ -1485,9 +1485,9 @@ int gen_novel_view(krt_CamParam* ccam, unsigned char* bgra, float* range_img, kr
 	cuCam_data_t camp;
 	alloc_camp(&camp, ccam, vcam); // camera parameter for camp
 
-								   //	--	step 0. label foreground/background pixels for later processing
-								   //				foreground pixels will be gaussian-smoothed after merging all the novel views
-								   //				background pixels will be used to perform a erosion to remove ghost coutours
+	//	--	step 0. label foreground/background pixels for later processing
+	//				foreground pixels will be gaussian-smoothed after merging all the novel views
+	//				background pixels will be used to perform a erosion to remove ghost coutours
 	novel_pixel_label_t* labels = NULL;
 	labels = malloc(width * height * sizeof(novel_pixel_label_t));
 	//初始化全部label层都是空洞
@@ -1498,8 +1498,8 @@ int gen_novel_view(krt_CamParam* ccam, unsigned char* bgra, float* range_img, kr
 	const float dtr = 0.01666667f; // -- disparity threashold ratio  ????
 	const int edge_radius = 4; // -- the same as in the original paper   for 1080P is 4. 
 
-							   /////!!!!!!!!!!!!!!!!!!!!!!!!!!!!! label_boundary_pixels is random !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-							   //标记label层后经边缘区域，其余区域标记为main layer
+	/////!!!!!!!!!!!!!!!!!!!!!!!!!!!!! label_boundary_pixels is random !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	//标记label层后经边缘区域，其余区域标记为main layer
 	label_boundary_pixels2(cuRef.range_img, labels, novel_pixel_background_boundary, fB, dtr * drange, edge_radius, width, height);
 	// 左右静态增长的前后景边缘
 
@@ -2390,7 +2390,7 @@ void setVirCamParam(krt_CamParam* vcam, InputParameters* input, int width, int h
 	//vcam->lens_fov = 10;
 	//vcam->fisheye_radius = 2000;
 	FILE *fp = NULL;
-	fp = fopen("para_vcamera1004_diff_noresize.txt", "r");
+	fp = fopen("para_vcamera1007.txt", "r");
 	char temps[100];
 	int tempid;
 
