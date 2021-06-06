@@ -127,16 +127,17 @@ typedef enum {
 
 typedef struct krt_CamParam
 {
-	//gs begin add 原本没有krt_K[]
+	//gs begin add 原本没有krt_K[] 用于放旋转矩阵
 	float krt_K[9];
 	float mindepth, maxdepth;
+	float fx, fy; // 用于存放两个焦距
 	//gs end add
 	//float krt_k_inv[9];
 	float krt_R[9];
 	float krt_WorldPosition[3];
 	I2R_LENS_TYPE ltype;
 	float krt_kc[3];
-	float krt_cc[2];
+	float krt_cc[2]; // 应该是用来存放分辨率的一半的
 	int src_width, src_height;
 	float lens_fov;
 	float fisheye_radius; // -- in pixel unit at original resolution
@@ -260,17 +261,22 @@ int set_sfm_parameters(float* save_data)
 
 	//gs begin add
 	FILE *fp = NULL, *tp = NULL;
-	fp = fopen("para_cameras1007.txt", "r");
-	tp = fopen("./depth_1007/minmaxdepth.txt", "r");
+	fp = fopen("para_cameras_1004_diff_noresize.txt", "r");
+	tp = fopen("./depth_1004_diff_noresize/minmaxdepth.txt", "r");
 	char temps[100];
 	int tempid;
 	for (int m = 0; m < CamNum; m++)
 	{
 		fscanf(fp, "%s %d\n", temps, &tempid);
 
+		fscanf(fp, "%s %d %d\n", temps, &krt_camparam[m].src_width, &krt_camparam[m].src_height);
+
 		for (int tempi = 0; tempi < 9; tempi++)
 			krt_camparam[m].krt_K[tempi] = 0;
 		fscanf(fp, "%s %f %f %f %f\n", temps, &krt_camparam[m].krt_K[0], &krt_camparam[m].krt_K[4], &krt_camparam[m].krt_K[2], &krt_camparam[m].krt_K[5]);
+
+		krt_camparam[m].krt_cc[0] = krt_camparam[m].krt_K[2];
+		krt_camparam[m].krt_cc[1] = krt_camparam[m].krt_K[5];
 
 		fscanf(fp, "%s", temps);
 		for (int tempi = 0; tempi < 9; tempi++)
@@ -397,12 +403,15 @@ void label_foreground_boudary_pixels(float* range_img, novel_pixel_label_t* labe
 		}
 }
 
-void label_background_boudary_pixels(float* range_img, novel_pixel_label_t* labels, const float dthresh, const float fB, const int width, const int height, const int edge_radius)
+void label_background_boudary_pixels(float* range_img, novel_pixel_label_t* labels, const float dthresh, const float fB, const int width, const int height, const int edge_radius, float mindepth, float maxdepth)
 {
 	int x, y;
-	for (y = 0; y < height; y++)
+	//FILE *temp = fopen("./results/temp.txt", "a+");
+	for (y = 0; y < min(height, 1000); y++) // gs add height改为min(height, 1000) 或否
 		for (x = 0; x < width; x++)
 		{
+			if (range_img[y * width + x] > 17) continue; // gs add 背景前景边界判断 稀疏方案
+
 			float cval = fB / (range_img[y * width + x] + 1e-5f);
 
 			int rx = min(x + 1, width - 1);
@@ -416,25 +425,38 @@ void label_background_boudary_pixels(float* range_img, novel_pixel_label_t* labe
 
 			if (fabs(grad_x) >= dthresh)
 			{
+				//if (range_img[y * width + rx] >= maxdepth - 0.05 &&  range_img[y * width + x] > 17) continue; // gs add 背景前景边界判断 疑似0的位置都跳过 稠密方案
+				//if (range_img[y * width + x] >= maxdepth - 0.05 &&  range_img[y * width + rx] > 17) continue; // gs add 背景前景边界判断 疑似0的位置都跳过 稠密方案
+				if (range_img[y * width + rx] >= maxdepth - 0.05) continue; // 稀疏方案
+
 				int sid = grad_x > 0.f ? 1 : -edge_radius;
 				int eid = grad_x > 0.f ? edge_radius : 0;
 				for (int i = sid; i <= eid; i++)//如果梯度大于一定值，就把周围一定范围内的labels值赋为novel_pixel_background_boundary
 				{
 					int imx = max(0, min(width - 1, i + x));
+					//if (range_img[y * width + imx] >= maxdepth - 0.05) continue; // 稀疏方案
 					labels[y * width + imx] = novel_pixel_background_boundary;
+					//fprintf(temp, "x, %d; %d %d, %d; %f %f\n", y, x, y, imx, dthresh, fabs(grad_x));
 				}
 			} // -- process horizontal gradients
 			if (fabs(grad_y) >= dthresh)
 			{
+				//if (range_img[dy * width + x] >= maxdepth - 0.05 && range_img[y * width + x] > 17) continue; // gs add 背景前景边界判断 疑似0的位置都跳过 稠密方案
+				//if (range_img[y * width + x] >= maxdepth - 0.05 && range_img[dy * width + x] > 17) continue; // gs add 背景前景边界判断 疑似0的位置都跳过 稠密方案
+				if (range_img[dy * width + x] >= maxdepth - 0.05) continue; // 稀疏方案
+
 				int sid = grad_y > 0.f ? 1 : -edge_radius;
 				int eid = grad_y > 0.f ? edge_radius : 0;
 				for (int i = sid; i <= eid; i++)
 				{
 					int imy = max(0, min(height - 1, i + y));
+					//if (range_img[imy * width + x] >= maxdepth - 0.05) continue; // 稀疏方案
 					labels[imy * width + x] = novel_pixel_background_boundary;
+					//fprintf(temp, "y, %d; %d %d, %d; %f %f\n", y, x, imy, x, dthresh, fabs(grad_y));
 				}
 			} // -- process vertical gradients
 		}
+	//fclose(temp);
 }
 // 如果某一点梯度的绝对值大于dthresh且为正（距离相比于右侧点来说更近），则右侧和下侧edge_radius范围内的点的label标记为novel_pixel_background_boundary；左侧和上侧edge_radius范围内的点的label标记为novel_pixel_foreground_boundary；
 // 如果某一点梯度的绝对值大于dthresh且为负（距离相比于右侧点来说更远），则右侧和下侧edge_radius范围内的点的label标记为novel_pixel_foreground_boundary；左侧和上侧edge_radius范围内的点的label标记为novel_pixel_background_boundary；
@@ -462,7 +484,7 @@ void set_main_layer_labels(novel_pixel_label_t* labels, const int width, const i
 
 
 int label_boundary_pixels2(float* range_img, novel_pixel_label_t* labels, novel_pixel_label_t tarL,
-	float fB, float dthresh, const int edge_radius, int width, int height)
+	float fB, float dthresh, const int edge_radius, int width, int height, float mindepth, float maxdepth)
 {
 
 	//set_main_layer_labels(labels, width, height, tarL);   //wkj  the same as putting it  below  label_background_boudary_pixels
@@ -473,7 +495,7 @@ int label_boundary_pixels2(float* range_img, novel_pixel_label_t* labels, novel_
 	}
 	else if (tarL == novel_pixel_background_boundary)
 	{
-		label_background_boudary_pixels(range_img, labels, dthresh, fB, width, height, edge_radius);
+		label_background_boudary_pixels(range_img, labels, dthresh, fB, width, height, edge_radius, mindepth, maxdepth);
 	}
 
 	set_main_layer_labels(labels, width, height, tarL);
@@ -773,9 +795,10 @@ void my_max(unsigned int* old_value, unsigned int new_value)
 
 
 int warp_range_to_novel_view(krt_CamParam* ccam, float* range_img, novel_pixel_label_t* labels, krt_CamParam *vcam,
-	float* novel_range_img, novel_pixel_label_t tar_label, novel_pixel_label_t* novel_label_img, float* r2t_curve, int r2t_len, float fB, float dthresh, const int edge_radius, int ispinhole)
+	float* novel_range_img, novel_pixel_label_t tar_label, novel_pixel_label_t* novel_label_img, float* r2t_curve, int r2t_len, float fB, float dthresh, const int edge_radius, int ispinhole, int maxheight, int maxwidth)
 {
 	int width = ccam->src_width, height = ccam->src_height;
+	//printf("!!!!!!!! width = %d height = %d krt_cc[0] = %d krt_cc[1] = %d\n", width, height, ccam->krt_cc[0], ccam->krt_cc[1]);
 	float p3D[3] = { 0, 0, 0 };// Mat::zeros(3, 1, CV_32FC1);
 	float krt_R[9];
 
@@ -894,7 +917,7 @@ int warp_range_to_novel_view(krt_CamParam* ccam, float* range_img, novel_pixel_l
 				yp = (int)roundf(v_xyz[1] / v_xyz[2]);
 			}
 
-			if (r < vcam->fisheye_radius && xp >= 1 && xp <= (width - 1) - 1 && yp >= 1 && yp <= (height - 1) - 1)   //because 3x3 
+			if (r < vcam->fisheye_radius && xp >= 1 && xp <= (maxwidth - 1) - 1 && yp >= 1 && yp <= (maxheight - 1) - 1)   //because 3x3 
 			{
 				float newrange;
 				if (ispinhole)
@@ -911,16 +934,16 @@ int warp_range_to_novel_view(krt_CamParam* ccam, float* range_img, novel_pixel_l
 					for (int n = xp - 1; n <= xp + 1; n++)
 					{
 						{
-							float nrange = novel_range_img[m * width + n];
+							float nrange = novel_range_img[m * maxwidth + n];
 							if (nrange == 0.f)
 							{
-								novel_range_img[m * width + n] = newrange;
-								novel_label_img[m * width + n] = tar_label;    //wkj
+								novel_range_img[m * maxwidth + n] = newrange;
+								novel_label_img[m * maxwidth + n] = tar_label;    //wkj
 							}
 							else if (newrange < nrange)
 							{
-								novel_range_img[m * width + n] = newrange; // (xp,yp)周围九宫格内的点，如果没有深度值就赋值为newrange，有深度值则与newrange比较，取较小的
-								novel_label_img[m * width + n] = tar_label;
+								novel_range_img[m * maxwidth + n] = newrange; // (xp,yp)周围九宫格内的点，如果没有深度值就赋值为newrange，有深度值则与newrange比较，取较小的
+								novel_label_img[m * maxwidth + n] = tar_label;
 							}
 						}
 					}
@@ -1356,7 +1379,7 @@ float filtre_lanczos(unsigned char * src, float j, float i, int input_width, int
 			idx_y = (int)j + n + 1;
 
 			coef = lanczos_coef(i - idx_x) * lanczos_coef(j - idx_y);
-
+			//coef = 1;
 			// when the neib. pixel is outside the boundary, using the boundary pixels
 			idx_x = (idx_x < 0) ? 0 : idx_x;
 			idx_y = (idx_y < 0) ? 0 : idx_y;
@@ -1379,14 +1402,14 @@ float filtre_lanczos(unsigned char * src, float j, float i, int input_width, int
 
 
 void generate_novel_view(cuRef_data_t refData, float* novel_range_img, unsigned char* novel_view, novel_pixel_label_t* novel_ls, float* novel_conf,
-	novel_pixel_label_t tarL, int width, int height, cuCam_data_t camp, const float prefW, float fB, int ispinhole)
+	novel_pixel_label_t tarL, int width, int height, cuCam_data_t camp, const float prefW, float fB, int ispinhole, int maxheight, int maxwidth)
 {	// refData是参考相机，camp中既有虚拟相机参数也有参考相机参数，其余参数都是虚拟相机的
 	printf("prefW: %f\n", prefW);
 	int x, y;
-	for (y = 0; y < height; y++)
-		for (x = 0; x < width; x++)
+	for (y = 0; y < maxheight; y++)
+		for (x = 0; x < maxwidth; x++)
 		{
-			float range = novel_range_img[y * width + x];
+			float range = novel_range_img[y * maxwidth + x];
 
 			if (range <= 0.f)
 			{
@@ -1418,9 +1441,9 @@ void generate_novel_view(cuRef_data_t refData, float* novel_range_img, unsigned 
 				pix[1] = filtre_lanczos(refData.cuTex, ypf + 0.5f, xpf + 0.5f, width, height, width, 1);
 				pix[2] = filtre_lanczos(refData.cuTex, ypf + 0.5f, xpf + 0.5f, width, height, width, 2);
 
-				novel_view[y * width * 3 + x * 3 + 0] = (unsigned char)(pix[0]); //使用参考视角的RGB图像获得虚拟视角的RGB图像
-				novel_view[y * width * 3 + x * 3 + 1] = (unsigned char)(pix[1]);
-				novel_view[y * width * 3 + x * 3 + 2] = (unsigned char)(pix[2]);
+				novel_view[y * maxwidth * 3 + x * 3 + 0] = (unsigned char)(pix[0]); //使用参考视角的RGB图像获得虚拟视角的RGB图像
+				novel_view[y * maxwidth * 3 + x * 3 + 1] = (unsigned char)(pix[1]);
+				novel_view[y * maxwidth * 3 + x * 3 + 2] = (unsigned char)(pix[2]);
 
 				// -- also compute the back projection for confidence   底下都是计算conf，（xp，yp）参考相机图像坐标系坐标
 				int xp = max(0, min((int)(round(xpf + 0.5f)), 1 * width - 1));
@@ -1451,10 +1474,12 @@ void generate_novel_view(cuRef_data_t refData, float* novel_range_img, unsigned 
 				//虚拟相机下的3D坐标pback，用I矩阵和0向量重新映射一遍，用来观测误差参数
 				if (project_to_camera_dp(pback, camp.vR, camp.vt, camp.vKc, camp.vCC, camp.vfradius, camp.vfov, reso, &bxpf, &bypf, ispinhole))
 				{
+					//if (y == 429 && x == 954) getchar();
 					float diffx = x - bxpf, diffy = y - bypf;             //wkj
 					float dist = sqrtf(diffx * diffx + diffy * diffy);
-					novel_conf[y * width + x] = expf(-dist / 5.f) * prefW;          //mconf   权重用到该点的深度图，深度置信度
-
+					//printf("!!!!!!!! %f\n", prefW);
+					novel_conf[y * maxwidth + x] = expf(-dist / 20.f) * prefW;          //mconf   权重用到该点的深度图，深度置信度
+					//printf("%f\n", novel_conf[y * maxwidth + x]);
 				}
 			}
 
@@ -1464,21 +1489,22 @@ void generate_novel_view(cuRef_data_t refData, float* novel_range_img, unsigned 
 }
 
 
-int warp_image_to_novel_view(novel_view_t* nv, cuRef_data_t *curef, cuCam_data_t* cuCam, int width, int height, float fB, int ispinhole)
+int warp_image_to_novel_view(novel_view_t* nv, cuRef_data_t *curef, cuCam_data_t* cuCam, int width, int height, float fB, int ispinhole, int maxheight, int maxwidth)
 {
 
-	generate_novel_view(*curef, nv->mrange_img, nv->mnovel_view, nv->mlabel_img, nv->mconf, novel_pixel_main, width, height, *cuCam, nv->prefW, fB, ispinhole);
+	generate_novel_view(*curef, nv->mrange_img, nv->mnovel_view, nv->mlabel_img, nv->mconf, novel_pixel_main, width, height, *cuCam, nv->prefW, fB, ispinhole, maxheight, maxwidth);
 
 	return I2R_OK;
 }
 
-int gen_novel_view(krt_CamParam* ccam, unsigned char* bgra, float* range_img, krt_CamParam *vcam, novel_view_t *nv, float fB, float mindepth, float maxdepth, int s)
+int gen_novel_view(krt_CamParam* ccam, unsigned char* bgra, float* range_img, krt_CamParam *vcam, novel_view_t *nv, float fB, float mindepth, float maxdepth, int s, int pixel_h, int pixel_w, int maxheight, int maxwidth)
 {	//ccam是参考视角的参数, bgra是当前参考视角的RGB图像, range_img是当前参考视角的D图像, vcam是虚拟相机的参数
-	//nv是虚拟视角的各种初始化过参数, fB,min,max是自定义参数, s是参考视角的序列号9,11
-	I2R_ASSERT(ccam->src_width == vcam->src_width);
-	I2R_ASSERT(ccam->src_height == vcam->src_height);
+	//nv是参考视角投影到虚拟视角的各种初始化过参数, fB,min,max是自定义参数, s是参考视角的序列号9,11
+	//I2R_ASSERT(ccam->src_width == vcam->src_width);
+	//I2R_ASSERT(ccam->src_height == vcam->src_height);
 
-	int width = vcam->src_width, height = vcam->src_height;
+	//int width = vcam->src_width, height = vcam->src_height;
+	int width = pixel_w, height = pixel_h;
 	// -- allocate texture object for bgra data
 	cuRef_data_t cuRef;
 	alloc_cuRef(&cuRef, bgra, range_img, width, height); // rgb & depth for cuRef
@@ -1495,14 +1521,63 @@ int gen_novel_view(krt_CamParam* ccam, unsigned char* bgra, float* range_img, kr
 
 	float maxdisp = fB / mindepth, mindisp = fB / maxdepth;
 	float drange = maxdisp - mindisp + 1;
-	const float dtr = 0.01666667f; // -- disparity threashold ratio  ????
+	const float dtr = 20*0.01666667f; // -- disparity threashold ratio  ???? gs add dtr 原本为 0.01666667f;
 	const int edge_radius = 4; // -- the same as in the original paper   for 1080P is 4. 
 
 	/////!!!!!!!!!!!!!!!!!!!!!!!!!!!!! label_boundary_pixels is random !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	//标记label层后经边缘区域，其余区域标记为main layer
-	label_boundary_pixels2(cuRef.range_img, labels, novel_pixel_background_boundary, fB, dtr * drange, edge_radius, width, height);
+	label_boundary_pixels2(cuRef.range_img, labels, novel_pixel_background_boundary, fB, dtr * drange, edge_radius, width, height, mindepth, maxdepth);
 	// 左右静态增长的前后景边缘
+	//gs begin
+	if (s == 0)
+	{
+		FILE *tempfile = fopen("./results/hlabel1.txt", "wb");
+		for (int di = 0; di < height; di++)
+		{
+			for (int dj = 0; dj < width; dj++)
+			{
+				fprintf(tempfile, "%d ", labels[di*width + dj]);
+			}
+			fprintf(tempfile, "\n");
+		}
+		fclose(tempfile);
 
+		FILE *tempfile2 = fopen("./results/hrange1.txt", "wb");
+		for (int di = 0; di < height; di++)
+		{
+			for (int dj = 0; dj < width; dj++)
+			{
+				fprintf(tempfile2, "%lf ", range_img[di*width + dj]);
+			}
+			fprintf(tempfile2, "\n");
+		}
+		fclose(tempfile2);
+	}
+	if (s == 1)
+	{
+		FILE *tempfile = fopen("./results/hlabel3.txt", "wb");
+		for (int di = 0; di < height; di++)
+		{
+			for (int dj = 0; dj < width; dj++)
+			{
+				fprintf(tempfile, "%d ", labels[di*width + dj]);
+			}
+			fprintf(tempfile, "\n");
+		}
+		fclose(tempfile);
+
+		FILE *tempfile2 = fopen("./results/hrange3.txt", "wb");
+		for (int di = 0; di < height; di++)
+		{
+			for (int dj = 0; dj < width; dj++)
+			{
+				fprintf(tempfile2, "%lf ", range_img[di*width + dj]);
+			}
+			fprintf(tempfile2, "\n");
+		}
+		fclose(tempfile2);
+	}
+	// gs end
 
 	//	--	step 1. warp range image by forward projection, 
 	int r2t_len = (int)(ccam->fisheye_radius * 2.f);
@@ -1516,7 +1591,7 @@ int gen_novel_view(krt_CamParam* ccam, unsigned char* bgra, float* range_img, kr
 	st = clock();
 	// -- warp main/foreground layer sperately, 只投影novel_pixel_main的pixel
 	// r2t_len = 参考相机的fisheye_radius*2, r2t_curve是一系列根
-	warp_range_to_novel_view(ccam, range_img, labels, vcam, nv->mrange_img, novel_pixel_main, nv->mlabel_img, r2t_curve, r2t_len, fB, dtr * drange, edge_radius, IS_PINHOLE);
+	warp_range_to_novel_view(ccam, range_img, labels, vcam, nv->mrange_img, novel_pixel_main, nv->mlabel_img, r2t_curve, r2t_len, fB, dtr * drange, edge_radius, IS_PINHOLE, maxheight, maxwidth);
 	free(r2t_curve);
 
 	printf("warp_range_to_novel_view time = %f\n", (double)(clock() - st) / CLOCKS_PER_SEC);
@@ -1540,7 +1615,7 @@ int gen_novel_view(krt_CamParam* ccam, unsigned char* bgra, float* range_img, kr
 	free(wd_array);
 	printf("bilateral_filtering_novel_range time = %f\n", (double)(clock() - st) / CLOCKS_PER_SEC);
 #else
-	median_filtering_novel_range(nv->mrange_img, nv->mlabel_img, fB, mindisp, drange, 4, width, height);
+	median_filtering_novel_range(nv->mrange_img, nv->mlabel_img, fB, mindisp, drange, 4, maxwidth, maxheight);
 
 	printf("median_filtering_novel_range time = %f\n", (double)(clock() - st) / CLOCKS_PER_SEC);
 #endif // BILATERAL_FILTER
@@ -1575,7 +1650,7 @@ int gen_novel_view(krt_CamParam* ccam, unsigned char* bgra, float* range_img, kr
 
 
 	//	--	step 3. generate layered novel view image based on the novel range image
-	warp_image_to_novel_view(nv, &cuRef, &camp, width, height, fB, IS_PINHOLE);
+	warp_image_to_novel_view(nv, &cuRef, &camp, width, height, fB, IS_PINHOLE, maxheight, maxwidth);
 	//nv是新视角，cuRef中是参考视角的RGB与深度图，camp有参考视角相机的参数也有虚拟相机参数，
 	printf("warp_image_to_novel_view time = %f\n", (double)(clock() - st) / CLOCKS_PER_SEC);
 
@@ -1630,6 +1705,7 @@ void merge_novel_views_mainlayer(novel_view_t* nvs, int nbr, const float fB, con
 			float bgr[3] = { 0.f, 0.f, 0.f };
 			float sumW = 0.f, sumR = 0.f, minR = 1e10f;
 			int  is_hole = 1;
+			//if (y == 429 && x == 954) getchar();
 
 			//遍历两个参考视点
 			for (int i = 0; i < nbr; i++)
@@ -2008,7 +2084,7 @@ int merge_novel_views(novel_view_t* nvs, int nbr, int width, int height, const f
 	//(2)lable process
 	const int edge_radius = 1;
 	memset(mlabel, novel_pixel_hole, width * height * sizeof(novel_pixel_label_t));
-	label_boundary_pixels2(mrange, mlabel, novel_pixel_foreground_boundary, fB, dtr * drange, edge_radius, width, height);
+	label_boundary_pixels2(mrange, mlabel, novel_pixel_foreground_boundary, fB, dtr * drange, edge_radius, width, height, mindepth, maxdepth);
 	memset(expanded_label, novel_pixel_hole, width * height * sizeof(novel_pixel_label_t));
 	expand_label_pixels(mlabel, expanded_label, novel_pixel_foreground_boundary, width, height, 2); // -- expand foreground boundary
 																									////对纹理图的前景边缘进行滤波
@@ -2390,15 +2466,20 @@ void setVirCamParam(krt_CamParam* vcam, InputParameters* input, int width, int h
 	//vcam->lens_fov = 10;
 	//vcam->fisheye_radius = 2000;
 	FILE *fp = NULL;
-	fp = fopen("para_vcamera1007.txt", "r");
+	fp = fopen("para_vcamera_1004_diff_noresize.txt", "r");
 	char temps[100];
 	int tempid;
 
 	fscanf(fp, "%s %d\n", temps, &tempid);
 
+	fscanf(fp, "%s %d %d\n", temps, &vcam->src_width, &vcam->src_height);
+
 	for (int tempi = 0; tempi < 9; tempi++)
 		vcam->krt_K[tempi] = 0;
 	fscanf(fp, "%s %f %f %f %f\n", temps, &vcam->krt_K[0], &vcam->krt_K[4], &vcam->krt_K[2], &vcam->krt_K[5]);//K
+
+	vcam->krt_cc[0] = vcam->krt_K[2];
+	vcam->krt_cc[1] = vcam->krt_K[5];
 
 	fscanf(fp, "%s", temps);
 	for (int tempi = 0; tempi < 9; tempi++)

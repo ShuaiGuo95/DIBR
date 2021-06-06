@@ -34,25 +34,25 @@ int main(int argc, char** argv)
 
 	novel_view_t  nvs[REF_CAM_N];
 
-	Configure(argc, argv);   //get patameters from configure file
+	Configure(argc, argv);   //get patameters from configure file 从v10.cfg中读入input参数
 
 	printf("Input image width = %d, height = %d\n", input->SourceWidth, input->SourceHeight);
 	//----------initialize input parameter----------
-	// gs begin change
-	FILE *kp = NULL;
-	kp = fopen("./depth_1007/resolutions.txt", "r");
 	int i, j;
+	// gs begin change
+	/*FILE *kp = NULL;
+	kp = fopen("./depth_1004_diff_noresize/resolutions.txt", "r");
 	for (i = 0; i < 12; i++)
 	{
 		// krt_camparam[i].src_width  = input->SourceWidth ;
 		// krt_camparam[i].src_height = input->SourceHeight;
 		fscanf(kp, "%d %d\n", &krt_camparam[i].src_width, &krt_camparam[i].src_height);
-	}
+	}*/
 	pixel_w = input->SourceWidth;
 	pixel_h = input->SourceHeight;
-	CamNum = input->CamNum;  //should be placed before init_with_sfm_file, since init_with_sfm_file will use CamNum
+	CamNum = 12;  //should be placed before init_with_sfm_file, since init_with_sfm_file will use CamNum // 这里是需要改的，相机数量
 
-	init_with_sfm_file(input->Cam_Params_File); //v10.cfg是虚拟视角的参数，camps-max-min-depth.sfm是所有相机的参数
+	init_with_sfm_file(input->Cam_Params_File); //v10.cfg是虚拟视角的参数，camps-max-min-depth.sfm是所有相机的参数。读入所有相机的参数
 	FILE *depth_file_output = fopen(input->Depth_Output_File, "wb");
 	FILE *color_file_output = fopen(input->Color_Output_File, "wb");
 	printf("%s %s\n", input->Depth_Output_File, input->Color_Output_File);
@@ -79,11 +79,14 @@ int main(int argc, char** argv)
 	//selectTwoView(vcam, &cam12[0],&dist[0],&test[0],&flag);
 	//selectTwoView_new(vcam, &cam12[0], &dist[0]);
 	// 可以手动修改值
-	cam12[0] = 9;
-	cam12[1] = 11;
+	cam12[0] = 8;
+	cam12[1] = 10;
 
 	int maxwidth = max(krt_camparam[cam12[0]].src_width, krt_camparam[cam12[1]].src_width);
 	int maxheight = max(krt_camparam[cam12[0]].src_height, krt_camparam[cam12[1]].src_height);
+
+	float minmindepth = min(krt_camparam[cam12[0]].mindepth, krt_camparam[cam12[1]].mindepth);
+	float maxmaxdepth = max(krt_camparam[cam12[0]].maxdepth, krt_camparam[cam12[1]].maxdepth);
 
 	// 将input中读入的虚拟视点的参数导入到vcam中
 	setVirCamParam(vcam, input, maxwidth, maxheight); //vcam是虚拟视角
@@ -372,13 +375,12 @@ int main(int argc, char** argv)
 
 
 #endif // 
-		printf("maxdisp=%f, mindisp=%f, fB=%f, mindepth=%f, maxdepth=%f\n", maxdisp, mindisp, fB, mindepth, maxdepth);
 		// maxdisp=1625.199951, mindisp=32.504002, fB=32504.000000, mindepth=20.000000, maxdepth=1000.000000
 		// 这一块可以并行，可能没有必要
 		//gs begin
-		maxdisp = fB / krt_camparam[re_index_input].maxdepth;
-		mindisp = fB / krt_camparam[re_index_input].mindepth;
-		printf("maxdepth = %f, mindepth = %f\n", krt_camparam[re_index_input].maxdepth, krt_camparam[re_index_input].mindepth);
+		mindisp = fB / krt_camparam[re_index_input].maxdepth;
+		maxdisp = fB / krt_camparam[re_index_input].mindepth;
+		printf("maxdepth = %f, mindepth = %f, maxdisp = %f, mindisp = %f\n", krt_camparam[re_index_input].maxdepth, krt_camparam[re_index_input].mindepth, maxdisp, mindisp);
 		//gs end
 		for (j = 0; j < pixel_h; j++)
 		{
@@ -389,6 +391,35 @@ int main(int argc, char** argv)
 				// in_img_depth_float[j*pixel_w + i] = (float)in_buf_depth[j*pixel_w + i];
 			}
 		}
+		// gs begin
+		if (sss == 0)
+		{
+			FILE *tempfile2 = fopen("./results/hrange1.txt", "wb");
+			for (int di = 0; di < pixel_h; di++)
+			{
+				for (int dj = 0; dj < pixel_w; dj++)
+				{
+					fprintf(tempfile2, "%lf ", in_img_depth_float[di*pixel_w + dj]);
+				}
+				fprintf(tempfile2, "\n");
+			}
+			fclose(tempfile2);
+		}
+		if (sss == 1)
+		{
+			FILE *tempfile2 = fopen("./results/hrange3.txt", "wb");
+			for (int di = 0; di < pixel_h; di++)
+			{
+				for (int dj = 0; dj < pixel_w; dj++)
+				{
+					fprintf(tempfile2, "%lf ", in_img_depth_float[di*pixel_w + dj]);
+				}
+				fprintf(tempfile2, "\n");
+			}
+			fclose(tempfile2);
+		}
+		// gs end
+
 #endif // DEPTH_DOWNSAMPLE
 		//上面的loop是为了确保读到一张图
 
@@ -409,18 +440,88 @@ int main(int argc, char** argv)
 
 		start = clock();
 		// krt_camparam是各个相机的参数, re_index_input是参考视角序列号, vcam是虚拟相机参数
-		gen_novel_view(&krt_camparam[re_index_input], in_buf_color, in_img_depth_float, vcam, nv, fB, mindepth, maxdepth, sss);     //output is nv->mrange_img and nv->mlabel_img 
+		gen_novel_view(&krt_camparam[re_index_input], in_buf_color, in_img_depth_float, vcam, nv, fB, krt_camparam[re_index_input].mindepth, krt_camparam[re_index_input].maxdepth, sss, pixel_h, pixel_w, maxheight, maxwidth);     //output is nv->mrange_img and nv->mlabel_img 
 		if (sss == 0)
 		{
-			FILE *color_file_output = fopen("./results/warp1.yuv", "wb", re_index_input);
-			fwrite(nv->mnovel_view, 1, pixel_w * pixel_h * 3, color_file_output);
+			//FILE *color_file_output = fopen("./results/warp1.yuv", "wb");
+			//fwrite(nv->mnovel_view, 1, maxwidth * maxheight * 3, color_file_output);
+			//char command0[100];
+			//sprintf(command0, "%s %dx%d %s", "ffmpeg -s", maxwidth, maxheight, "-pix_fmt rgb24 -i ./results/warp1.yuv ./results/wapr1.png -y");
+			//system(command0);
+			// gs begin
+			FILE *tempfile = fopen("./results/warp1.txt", "wb");
+			for (int di = 0; di < maxheight; di++)
+			{
+				for (int dj = 0; dj < maxwidth; dj++)
+					fprintf(tempfile, "%d %d %d ", nv->mnovel_view[(di*maxwidth + dj) * 3], nv->mnovel_view[(di*maxwidth + dj) * 3 + 1], nv->mnovel_view[(di*maxwidth + dj) * 3 + 2]);
+				fprintf(tempfile, "\n");
+			}
+			fclose(tempfile);
+
+			FILE *tempfile1 = fopen("./results/mlabel1.txt", "wb");
+			FILE *tempfile2 = fopen("./results/mdepth1.txt", "wb");
+			for (int di = 0; di < maxheight; di++)
+			{
+				for (int dj = 0; dj < maxwidth; dj++)
+				{
+					fprintf(tempfile1, "%d ", nv->mlabel_img[di*maxwidth + dj]);
+					float depthi = nv->mrange_img[di*maxwidth + dj];
+					if (depthi == 0)
+						fprintf(tempfile2, "0 ");
+					else
+					{
+						float deptho = fB / depthi;
+						deptho = (deptho - mindisp)*255.f / (maxdisp - mindisp);
+						fprintf(tempfile2, "%f ", depthi);
+					}
+				}
+				fprintf(tempfile1, "\n");
+				fprintf(tempfile2, "\n");
+			}
+			fclose(tempfile1);
+			// gs end
 		}
 		if (sss == 1)
 		{
-			FILE* color_file_output = fopen("./results/warp3.yuv", "wb", re_index_input);
-			fwrite(nv->mnovel_view, 1, pixel_w * pixel_h * 3, color_file_output);
-		}
+			//FILE* color_file_output = fopen("./results/warp3.yuv", "wb");
+			//fwrite(nv->mnovel_view, 1, maxwidth * maxheight * 3, color_file_output);
+			//char command0[100];
+			//sprintf(command0, "%s %dx%d %s", "ffmpeg -s", maxwidth, maxheight, "-pix_fmt rgb24 -i ./results/warp3.yuv ./results/wapr3.png -y");
+			//system(command0);
+			// gs begin
+			FILE *tempfile = fopen("./results/warp3.txt", "wb");
+			for (int di = 0; di < maxheight; di++)
+			{
+				for (int dj = 0; dj < maxwidth; dj++)
+					fprintf(tempfile, "%d %d %d ", nv->mnovel_view[(di*maxwidth + dj) * 3], nv->mnovel_view[(di*maxwidth + dj) * 3 + 1], nv->mnovel_view[(di*maxwidth + dj) * 3 + 2]);
+				fprintf(tempfile, "\n");
+			}
+			fclose(tempfile);
 
+			FILE *tempfile1 = fopen("./results/mlabel3.txt", "wb");
+			FILE *tempfile2 = fopen("./results/mdepth3.txt", "wb");
+			for (int di = 0; di < maxheight; di++)
+			{
+				for (int dj = 0; dj < maxwidth; dj++)
+				{
+					fprintf(tempfile1, "%d ", nv->mlabel_img[di*maxwidth + dj]);
+					float depthi = nv->mrange_img[di*maxwidth + dj];
+					if (depthi == 0)
+						fprintf(tempfile2, "0 ");
+					else
+					{
+						float deptho = fB / depthi;
+						deptho = (deptho - mindisp)*255.f / (maxdisp - mindisp);
+						fprintf(tempfile2, "%f ", depthi);
+					}
+				}
+				fprintf(tempfile1, "\n");
+				fprintf(tempfile2, "\n");
+			}
+			fclose(tempfile1);
+			// gs end
+		}
+		
 
 		finish = clock();
 		totaltime = (double)(finish - start) / CLOCKS_PER_SEC;
@@ -432,13 +533,14 @@ int main(int argc, char** argv)
 	st = clock();
 	//nvs新视点的指针，ref-参考视点的个数=2
 	//merge的时候会对前景边缘进行smooth_foreground，对前后左右半径内的bgr取平均
-	merge_novel_views(nvs, REF_CAM_N, maxwidth, maxheight, fB, mindepth, maxdepth, out_buf_color, dist, flag);
+	printf("minmindepth=%f, maxmaxdepth=%f\n", minmindepth, maxmaxdepth);
+	merge_novel_views(nvs, REF_CAM_N, maxwidth, maxheight, fB, minmindepth, maxmaxdepth, out_buf_color, dist, flag);
 	fi = clock();
 	printf("merge time = %f\n", (double)(fi - st) / CLOCKS_PER_SEC);
 
 	int select_cam = 0;  //select  1  as output depth
-	maxdisp = fB / mindepth;
-	mindisp = fB / maxdepth;
+	maxdisp = fB / minmindepth;
+	mindisp = fB / maxmaxdepth;
 	//printf("%f %f !!!!!!!!!!!!!!!\n", mindepth, maxdepth);
 	for (j = 0; j < maxheight; j++)    //convert float-point range depth into fixed-point disparity depth
 		for (i = 0; i < maxwidth; i++)
@@ -449,6 +551,16 @@ int main(int argc, char** argv)
 		}
 	fwrite(out_buf_depth, 1, maxwidth * maxheight, depth_file_output);
 	fwrite(out_buf_color, 1, maxwidth * maxheight * 3, color_file_output);
+	//gs begin
+	FILE *tempfile = fopen("./results/out_buf_depth.txt", "wb");
+	for (int di = 0; di < maxheight; di++)
+	{
+		for (int dj = 0; dj < maxwidth; dj++)
+			fprintf(tempfile, "%d ", out_buf_depth[di*maxwidth + dj]);
+		fprintf(tempfile, "\n");
+	}
+	fclose(tempfile);
+	//gs end
 
 	fclose(depth_file_input);
 	fclose(color_file_input);
