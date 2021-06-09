@@ -9,6 +9,7 @@
 
 #define I2R_OK    1
 #define I2R_ERR   0 
+#define printtxt  0
 #define CV_PI       3.14159265358979323846
 //#define DEPTH_DOWNSAMPLE //decide whether use depth down sample or not. Modified in Apr, 2020
 #define IS_PINHOLE 1 // decide whether use pinhole model or not 
@@ -410,7 +411,7 @@ void label_background_boudary_pixels(float* range_img, novel_pixel_label_t* labe
 	for (y = 0; y < min(height, 1000); y++) // gs add height改为min(height, 1000) 或否
 		for (x = 0; x < width; x++)
 		{
-			if (range_img[y * width + x] > 17) continue; // gs add 背景前景边界判断 稀疏方案
+			//if (range_img[y * width + x] > 17) continue; // gs add 背景前景边界判断 稀疏方案
 
 			float cval = fB / (range_img[y * width + x] + 1e-5f);
 
@@ -425,9 +426,9 @@ void label_background_boudary_pixels(float* range_img, novel_pixel_label_t* labe
 
 			if (fabs(grad_x) >= dthresh)
 			{
-				//if (range_img[y * width + rx] >= maxdepth - 0.05 &&  range_img[y * width + x] > 17) continue; // gs add 背景前景边界判断 疑似0的位置都跳过 稠密方案
-				//if (range_img[y * width + x] >= maxdepth - 0.05 &&  range_img[y * width + rx] > 17) continue; // gs add 背景前景边界判断 疑似0的位置都跳过 稠密方案
-				if (range_img[y * width + rx] >= maxdepth - 0.05) continue; // 稀疏方案
+				if (range_img[y * width + rx] >= maxdepth - 0.05 &&  range_img[y * width + x] > 17) continue; // gs add 背景前景边界判断 疑似0的位置都跳过 稠密方案
+				if (range_img[y * width + x] >= maxdepth - 0.05 &&  range_img[y * width + rx] > 17) continue; // gs add 背景前景边界判断 疑似0的位置都跳过 稠密方案
+				//if (range_img[y * width + rx] >= maxdepth - 0.05) continue; // 稀疏方案
 
 				int sid = grad_x > 0.f ? 1 : -edge_radius;
 				int eid = grad_x > 0.f ? edge_radius : 0;
@@ -441,9 +442,9 @@ void label_background_boudary_pixels(float* range_img, novel_pixel_label_t* labe
 			} // -- process horizontal gradients
 			if (fabs(grad_y) >= dthresh)
 			{
-				//if (range_img[dy * width + x] >= maxdepth - 0.05 && range_img[y * width + x] > 17) continue; // gs add 背景前景边界判断 疑似0的位置都跳过 稠密方案
-				//if (range_img[y * width + x] >= maxdepth - 0.05 && range_img[dy * width + x] > 17) continue; // gs add 背景前景边界判断 疑似0的位置都跳过 稠密方案
-				if (range_img[dy * width + x] >= maxdepth - 0.05) continue; // 稀疏方案
+				if (range_img[dy * width + x] >= maxdepth - 0.05 && range_img[y * width + x] > 17) continue; // gs add 背景前景边界判断 疑似0的位置都跳过 稠密方案
+				if (range_img[y * width + x] >= maxdepth - 0.05 && range_img[dy * width + x] > 17) continue; // gs add 背景前景边界判断 疑似0的位置都跳过 稠密方案
+				//if (range_img[dy * width + x] >= maxdepth - 0.05) continue; // 稀疏方案
 
 				int sid = grad_y > 0.f ? 1 : -edge_radius;
 				int eid = grad_y > 0.f ? edge_radius : 0;
@@ -798,7 +799,7 @@ int warp_range_to_novel_view(krt_CamParam* ccam, float* range_img, novel_pixel_l
 	float* novel_range_img, novel_pixel_label_t tar_label, novel_pixel_label_t* novel_label_img, float* r2t_curve, int r2t_len, float fB, float dthresh, const int edge_radius, int ispinhole, int maxheight, int maxwidth)
 {
 	int width = ccam->src_width, height = ccam->src_height;
-	//printf("!!!!!!!! width = %d height = %d krt_cc[0] = %d krt_cc[1] = %d\n", width, height, ccam->krt_cc[0], ccam->krt_cc[1]);
+	printf("!!!!!!!! width = %d height = %d maxwidth = %d maxheight = %d\n", width, height, maxwidth, maxheight);
 	float p3D[3] = { 0, 0, 0 };// Mat::zeros(3, 1, CV_32FC1);
 	float krt_R[9];
 
@@ -866,10 +867,10 @@ int warp_range_to_novel_view(krt_CamParam* ccam, float* range_img, novel_pixel_l
 
 
 			if (np3D[2] < 0.f) { theta = CV_PI - theta; } // -- beyond 180 degree
-			if (theta > vcam->lens_fov)
+			/*if (theta > vcam->lens_fov) // gs change 删掉角度限制
 			{
 				continue;
-			} // -- out of the lens fov
+			}*/ // -- out of the lens fov
 			float tp2 = theta * theta;
 			float tp3 = theta * tp2;
 			float tp5 = tp3 * tp2;
@@ -917,7 +918,7 @@ int warp_range_to_novel_view(krt_CamParam* ccam, float* range_img, novel_pixel_l
 				yp = (int)roundf(v_xyz[1] / v_xyz[2]);
 			}
 
-			if (r < vcam->fisheye_radius && xp >= 1 && xp <= (maxwidth - 1) - 1 && yp >= 1 && yp <= (maxheight - 1) - 1)   //because 3x3 
+			if (xp >= 1 && xp <= (maxwidth - 1) - 1 && yp >= 1 && yp <= (maxheight - 1) - 1)   //because 3x3 gs add 删掉了r < vcam->fisheye_radius约束
 			{
 				float newrange;
 				if (ispinhole)
@@ -1083,7 +1084,7 @@ float find_medium(float depth_window[], int N)
 
 
 void median_filter_range_image(float* irange, float* orange, novel_pixel_label_t* ilabels, novel_pixel_label_t* olabels, int width, int height, int kradius, float fB, float mindp, float dprange)
-{
+{ // 这个算法大致是说，在边长为2k+1的正方形范围内，用按顺序排列在中间的深度值和label值覆盖所有这些的深度值和label值 gs
 	int x, y;
 	for (y = 0; y < height; y++)
 		for (x = 0; x < width; x++)
@@ -1304,7 +1305,7 @@ int project_to_camera_dp(float* worldP, float* R, float *t, float* kc, float* cc
 	float theta = atan(r_undistort);
 
 	if (newWorldP[2] < 0.f) { theta = CV_PI - theta; } // -- beyond 180 degree
-	if (theta > lens_fov) { return I2R_ERR; } // -- out of the lens fov
+	//if (theta > lens_fov) { return I2R_ERR; } // -- out of the lens fov gs change 删掉角度限制
 
 	float tp2 = theta * theta;
 	float tp3 = theta * tp2;
@@ -1325,7 +1326,7 @@ int project_to_camera_dp(float* worldP, float* R, float *t, float* kc, float* cc
 		*yp = uvz[1];
 	}
 
-	if ((r > fisheye_radius) || (*xp > img_reso[0]) || (*xp < 0) || (*yp > img_reso[1]) || (*yp < 0))
+	if ((*xp > img_reso[0]) || (*xp < 0) || (*yp > img_reso[1]) || (*yp < 0)) // gs add 把(r > fisheye_radius)条件删掉了
 	{
 		return I2R_ERR;// I2R_ERR;
 	} // -- out of the image plane
@@ -1409,6 +1410,11 @@ void generate_novel_view(cuRef_data_t refData, float* novel_range_img, unsigned 
 	for (y = 0; y < maxheight; y++)
 		for (x = 0; x < maxwidth; x++)
 		{
+			/*if (y == 491 && x == 39)
+			{
+				getchar();
+				getchar();
+			}*/
 			float range = novel_range_img[y * maxwidth + x];
 
 			if (range <= 0.f)
@@ -1529,7 +1535,7 @@ int gen_novel_view(krt_CamParam* ccam, unsigned char* bgra, float* range_img, kr
 	label_boundary_pixels2(cuRef.range_img, labels, novel_pixel_background_boundary, fB, dtr * drange, edge_radius, width, height, mindepth, maxdepth);
 	// 左右静态增长的前后景边缘
 	//gs begin
-	if (s == 0)
+	if (s == 0 && printtxt)
 	{
 		FILE *tempfile = fopen("./results/hlabel1.txt", "wb");
 		for (int di = 0; di < height; di++)
@@ -1553,7 +1559,7 @@ int gen_novel_view(krt_CamParam* ccam, unsigned char* bgra, float* range_img, kr
 		}
 		fclose(tempfile2);
 	}
-	if (s == 1)
+	if (s == 1 && printtxt)
 	{
 		FILE *tempfile = fopen("./results/hlabel3.txt", "wb");
 		for (int di = 0; di < height; di++)
@@ -1705,10 +1711,10 @@ void merge_novel_views_mainlayer(novel_view_t* nvs, int nbr, const float fB, con
 			float bgr[3] = { 0.f, 0.f, 0.f };
 			float sumW = 0.f, sumR = 0.f, minR = 1e10f;
 			int  is_hole = 1;
-			//if (y == 429 && x == 954) getchar();
+			//if (y == 491 && x == 39) getchar();
 
 			//遍历两个参考视点
-			for (int i = 0; i < nbr; i++)
+			for (int i = 0; i < nbr; i++) // gs change
 			{	//如果一个纹理图该像素位置为空洞，则跳过该纹理图
 				if (nvs[i].mlabel_img[y * width + x] != novel_pixel_main)////非深度图后景边缘区域的处理
 				{
@@ -2005,6 +2011,11 @@ void smooth_foreground(unsigned char* bgr, unsigned char* obgr, novel_pixel_labe
 	for (y = 0; y < height; y++)
 		for (x = 0; x < width; x++)
 		{
+			/*for (int c = 0; c < 3; c++) // gs add 取消滤波
+			{
+				obgr[y * width * 3 + x * 3 + c] = bgr[y * width * 3 + x * 3 + c];
+			}*/
+
 			if (labels[y * width + x] != novel_pixel_foreground_boundary)
 			{
 				for (int c = 0; c < 3; c++)
@@ -2078,7 +2089,7 @@ int merge_novel_views(novel_view_t* nvs, int nbr, int width, int height, const f
 	// -- fill the holes   (1) merge color,  generate mlable and mrange
 	//mnvdata 混合后的纹理图merge novel view，填补纹理图空洞
 	//expanded_label和orange都没用到
-	fill_holes_with_background_color__(mnvdata, mlabel, expanded_label, mrange, orange, fB, width, height, dtr * drange);
+	fill_holes_with_background_color__(mnvdata, mlabel, expanded_label, mrange, orange, fB, width, height, dtr * drange); // gs change 注释掉了滤波部分
 
 	//标记前景边缘
 	//(2)lable process

@@ -39,15 +39,6 @@ int main(int argc, char** argv)
 	printf("Input image width = %d, height = %d\n", input->SourceWidth, input->SourceHeight);
 	//----------initialize input parameter----------
 	int i, j;
-	// gs begin change
-	/*FILE *kp = NULL;
-	kp = fopen("./depth_1004_diff_noresize/resolutions.txt", "r");
-	for (i = 0; i < 12; i++)
-	{
-		// krt_camparam[i].src_width  = input->SourceWidth ;
-		// krt_camparam[i].src_height = input->SourceHeight;
-		fscanf(kp, "%d %d\n", &krt_camparam[i].src_width, &krt_camparam[i].src_height);
-	}*/
 	pixel_w = input->SourceWidth;
 	pixel_h = input->SourceHeight;
 	CamNum = 12;  //should be placed before init_with_sfm_file, since init_with_sfm_file will use CamNum // 这里是需要改的，相机数量
@@ -79,8 +70,8 @@ int main(int argc, char** argv)
 	//selectTwoView(vcam, &cam12[0],&dist[0],&test[0],&flag);
 	//selectTwoView_new(vcam, &cam12[0], &dist[0]);
 	// 可以手动修改值
-	cam12[0] = 8;
-	cam12[1] = 10;
+	cam12[0] = 9;
+	cam12[1] = 11;
 
 	int maxwidth = max(krt_camparam[cam12[0]].src_width, krt_camparam[cam12[1]].src_width);
 	int maxheight = max(krt_camparam[cam12[0]].src_height, krt_camparam[cam12[1]].src_height);
@@ -392,7 +383,7 @@ int main(int argc, char** argv)
 			}
 		}
 		// gs begin
-		if (sss == 0)
+		if (sss == 0 && printtxt)
 		{
 			FILE *tempfile2 = fopen("./results/hrange1.txt", "wb");
 			for (int di = 0; di < pixel_h; di++)
@@ -405,7 +396,7 @@ int main(int argc, char** argv)
 			}
 			fclose(tempfile2);
 		}
-		if (sss == 1)
+		if (sss == 1 && printtxt)
 		{
 			FILE *tempfile2 = fopen("./results/hrange3.txt", "wb");
 			for (int di = 0; di < pixel_h; di++)
@@ -441,7 +432,7 @@ int main(int argc, char** argv)
 		start = clock();
 		// krt_camparam是各个相机的参数, re_index_input是参考视角序列号, vcam是虚拟相机参数
 		gen_novel_view(&krt_camparam[re_index_input], in_buf_color, in_img_depth_float, vcam, nv, fB, krt_camparam[re_index_input].mindepth, krt_camparam[re_index_input].maxdepth, sss, pixel_h, pixel_w, maxheight, maxwidth);     //output is nv->mrange_img and nv->mlabel_img 
-		if (sss == 0)
+		if (sss == 0 && printtxt)
 		{
 			//FILE *color_file_output = fopen("./results/warp1.yuv", "wb");
 			//fwrite(nv->mnovel_view, 1, maxwidth * maxheight * 3, color_file_output);
@@ -481,7 +472,7 @@ int main(int argc, char** argv)
 			fclose(tempfile1);
 			// gs end
 		}
-		if (sss == 1)
+		if (sss == 1 && printtxt)
 		{
 			//FILE* color_file_output = fopen("./results/warp3.yuv", "wb");
 			//fwrite(nv->mnovel_view, 1, maxwidth * maxheight * 3, color_file_output);
@@ -552,14 +543,17 @@ int main(int argc, char** argv)
 	fwrite(out_buf_depth, 1, maxwidth * maxheight, depth_file_output);
 	fwrite(out_buf_color, 1, maxwidth * maxheight * 3, color_file_output);
 	//gs begin
-	FILE *tempfile = fopen("./results/out_buf_depth.txt", "wb");
-	for (int di = 0; di < maxheight; di++)
+	if (printtxt)
 	{
-		for (int dj = 0; dj < maxwidth; dj++)
-			fprintf(tempfile, "%d ", out_buf_depth[di*maxwidth + dj]);
-		fprintf(tempfile, "\n");
+		FILE *tempfile = fopen("./results/out_buf_depth.txt", "wb");
+		for (int di = 0; di < maxheight; di++)
+		{
+			for (int dj = 0; dj < maxwidth; dj++)
+				fprintf(tempfile, "%d ", out_buf_depth[di*maxwidth + dj]);
+			fprintf(tempfile, "\n");
+		}
+		fclose(tempfile);
 	}
-	fclose(tempfile);
 	//gs end
 
 	fclose(depth_file_input);
@@ -570,10 +564,10 @@ int main(int argc, char** argv)
 
 	char command0[100], command1[100], command2[100], command3[100];
 	char cwidth[10], cheight[10], name[10];
-	sprintf(command0, "%s %dx%d %s%d%s %s", "ffmpeg -s", maxwidth, maxheight, "-pix_fmt rgb24 -i ./results/color_100.yuv ./results/", cam12[0] + 1, ".png", "-y");
-	sprintf(command1, "%s %dx%d %s%d%s %s", "ffmpeg -s", maxwidth/3, maxheight/3, "-pix_fmt rgb24 -i ./results/depth_output0.yuv ./results/depth_output0_", cam12[0] + 1, ".png", "-y");
-	sprintf(command2, "%s %dx%d %s%d%s %s", "ffmpeg -s", maxwidth, maxheight, "-pix_fmt rgb24 -i ./results/warp1.yuv ./results/warp1_", cam12[0] + 1, ".png", "-y");
-	sprintf(command3, "%s %dx%d %s%d%s %s", "ffmpeg -s", maxwidth, maxheight, "-pix_fmt rgb24 -i ./results/warp3.yuv ./results/warp3_", cam12[0] + 1, ".png", "-y");
+	sprintf(command0, "%s %dx%d %s%d%s %s", "ffmpeg -s", maxwidth, maxheight, "-pix_fmt rgb24 -i ./results/color_100.yuv ./results/", cam12[0] + 1, "_filtered.png", "-y");
+	//sprintf(command1, "%s %dx%d %s%d%s %s", "ffmpeg -s", maxwidth/3, maxheight/3, "-pix_fmt rgb24 -i ./results/depth_output0.yuv ./results/depth_output0_", cam12[0] + 1, ".png", "-y");
+	//sprintf(command2, "%s %dx%d %s%d%s %s", "ffmpeg -s", maxwidth, maxheight, "-pix_fmt rgb24 -i ./results/warp1.yuv ./results/warp1_", cam12[0] + 1, ".png", "-y");
+	//sprintf(command3, "%s %dx%d %s%d%s %s", "ffmpeg -s", maxwidth, maxheight, "-pix_fmt rgb24 -i ./results/warp3.yuv ./results/warp3_", cam12[0] + 1, ".png", "-y");
 	/*printf("%s\n", command0);
 	printf("%s\n", command1);
 	printf("%s\n", command2);
