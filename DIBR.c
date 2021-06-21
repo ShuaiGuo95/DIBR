@@ -564,7 +564,7 @@ int main(int argc, char** argv)
 
 	char command0[100], command1[100], command2[100], command3[100];
 	char cwidth[10], cheight[10], name[10];
-	sprintf(command0, "%s %dx%d %s%d%s %s", "ffmpeg -s", maxwidth, maxheight, "-pix_fmt rgb24 -i ./results/color_100.yuv ./results/", cam12[0] + 1, "_filtered.png", "-y");
+	sprintf(command0, "%s %dx%d %s%d%s %s", "ffmpeg -s", maxwidth, maxheight, "-pix_fmt rgb24 -i ./results/color_100.yuv ./results/", cam12[0] + 1, ".png", "-y");
 	//sprintf(command1, "%s %dx%d %s%d%s %s", "ffmpeg -s", maxwidth/3, maxheight/3, "-pix_fmt rgb24 -i ./results/depth_output0.yuv ./results/depth_output0_", cam12[0] + 1, ".png", "-y");
 	//sprintf(command2, "%s %dx%d %s%d%s %s", "ffmpeg -s", maxwidth, maxheight, "-pix_fmt rgb24 -i ./results/warp1.yuv ./results/warp1_", cam12[0] + 1, ".png", "-y");
 	//sprintf(command3, "%s %dx%d %s%d%s %s", "ffmpeg -s", maxwidth, maxheight, "-pix_fmt rgb24 -i ./results/warp3.yuv ./results/warp3_", cam12[0] + 1, ".png", "-y");

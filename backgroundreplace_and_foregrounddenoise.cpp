@@ -17,6 +17,7 @@ struct node
 	int nodex, nodey;
 }tempnode;
 bool visited[2000][2000];
+bool forground_mark[2000][2000];
 
 int edgebegin[12] = {};
 int edgeend[12] = {};
@@ -39,6 +40,31 @@ int * getRandom(int N)
 		}
 	}
 	return r;
+}
+
+void background_replace(Mat color_input, Mat depth_input, Mat background_color, Mat background_depth)
+{
+	int h = depth_input.rows, w = depth_input.cols;
+	memset(forground_mark, 1, sizeof(forground_mark));
+	for (int i = 0; i < h; i++)
+	{
+		for (int j = 0; j < w; j++)
+		{
+			uchar* input_depth = depth_input.data + i*depth_input.step + j;
+			uchar* input_color = color_input.data + i*color_input.step + j * 3;
+			uchar* bg_depth = background_depth.data + i*background_depth.step + j;
+			uchar* bg_color = background_color.data + i*background_color.step + j * 3;
+			int in_b = input_color[0], in_g = input_color[1], in_r = input_color[2];
+			int bg_b = bg_color[0], bg_g = bg_color[1], bg_r = bg_color[2];
+
+			if ((in_b - bg_b)*(in_b - bg_b) + (in_g - bg_g)*(in_g - bg_g) + (in_r - bg_r)*(in_r - bg_r) < 300 && (in_b - bg_b)<20 && (in_g - bg_g)<20 && (in_r - bg_r)<20)
+			{
+				// 当前像素是背景，用模板替换掉
+				input_depth[0] = 125; //bg_depth[0]
+				forground_mark[i][j] = false;
+			}
+		}
+	}
 }
 
 void BFS(Mat color_input, Mat depth_input, Mat depth_output, int locate_x, int locate_y)
@@ -78,9 +104,10 @@ void BFS(Mat color_input, Mat depth_input, Mat depth_output, int locate_x, int l
 			nowy = min(nowy, w - 1);
 			//printf("nowx=%d, nowy=%d\n", nowx, nowy);
 
-			if (visited[nowx][nowy])
+			if (visited[nowx][nowy] || !forground_mark[nowx][nowy])
 			{
-				//printf("visited!\n");
+				//if (visited[nowx][nowy]) printf("visited\n");
+				//else printf("not forground\n");
 				continue;
 			}
 
@@ -89,7 +116,7 @@ void BFS(Mat color_input, Mat depth_input, Mat depth_output, int locate_x, int l
 			if (fabs(b - g) <= 20 && fabs(g - r) <= 20 && fabs(b - r) <= 20 && (b + g + r) > 150) continue;
 
 			uchar* depth_pixel_now = depth_input.data + nowx*depth_input.step + nowy;
-			if (depth_pixel_now[0] == 0)
+			if (depth_pixel_now[0] < 40)
 			{
 				//printf("pushback %d %d\n", nowx, nowy);
 				visited[nowx][nowy] = 1;
@@ -197,6 +224,16 @@ uchar background_search(Mat color_input, Mat depth_input, int h, int w, int i, i
 		return (uchar)((ansup + ansdw) / 2);
 }
 
+uchar down_search(Mat depth_input, int h, int w, int i, int j, int edge)
+{
+	for (int di = i; di < h; di++)
+	{
+		uchar* pixel_depth = depth_input.data + di*depth_input.step + j;
+		if (pixel_depth[0] > edge) return (uchar)(pixel_depth[0]);
+	}
+	return (uchar)0;
+}
+
 void denoise(Mat color_input, Mat depth_input, Mat depth_output, int index)
 {
 	int w = color_input.cols, h = color_input.rows;
@@ -211,13 +248,32 @@ void denoise(Mat color_input, Mat depth_input, Mat depth_output, int index)
 	int b, g, r;
 	bool isbackground;
 	uchar tempixel;
-	for (i = 350; i < 900; i++)
+	for (i = 0; i < h; i++) // 350-900
 	{
 		//printf("%d\n", i);
-		for (j = leftj; j < rightj; j++)
+		for (j = 0; j < w; j++)
 		{
-			//if (j == 947 && i == 609) getchar();
+			//if (j == 1299 && i == 492) getchar();
 			uchar* pixel_depth = depth_output.data + i*depth_output.step + j;
+			if (forground_mark[i][j])
+			{
+				if (pixel_depth[0] < 40)
+				{
+					BFS(color_input, depth_input, depth_output, i, j);
+					//getchar();
+					//if (j == 751 && i == 453)  cout << (int)pixel_depth[0] << endl;
+				}
+				if (pixel_depth[0] < 40)
+				{
+					pixel_depth[0] = down_search(depth_input, h, w, i, j, 40);
+				}
+			}
+			else if (!pixel_depth[0]) //如果经过BFS还为0，或者背景为0，则从上下方向找代替吧，没辙了
+			{
+				pixel_depth[0] = down_search(depth_input, h, w, i, j, 0);
+			}
+			//if (j == 947 && i == 609) getchar();
+			/*uchar* pixel_depth = depth_output.data + i*depth_output.step + j;
 			uchar* pixel_color = color_input.data + i*color_input.step + j * 3;
 			b = pixel_color[0];
 			g = pixel_color[1];
@@ -238,10 +294,10 @@ void denoise(Mat color_input, Mat depth_input, Mat depth_output, int index)
 					//cout << i << ' ' << j << " search " << (int)(pixel_depth[0]) << endl;
 				}
 			}
-			if (fabs(b - g) > 15 || fabs(g - r) > 15 || fabs(b - r) > 15 || (r + g + b)<=150) //ȥ������
+			if (fabs(b - g) > 15 || fabs(g - r) > 15 || fabs(b - r) > 15 || (r + g + b)<=150) //去除人物
 			{
 				pixel_depth[0] = background_search(color_input, depth_input, h, w, i, j);
-			}
+			}*/
 		}
 		//cout << endl;
 	}
@@ -250,8 +306,11 @@ void denoise(Mat color_input, Mat depth_input, Mat depth_output, int index)
 
 int main()
 {
-	char color_input_dir[100] = ".\\color_test\\";
-	char depth_input_dir[100] = ".\\depth_1004_same\\";
+	char color_background_dir[100] = ".\\background_color\\";
+	char depth_background_dir[100] = ".\\background_depth\\";
+
+	char color_input_dir[100] = ".\\color_100_0_200_same\\";
+	char depth_input_dir[100] = ".\\depth_100_0_200_same\\";
 	char color_input_file_name[100];
 	char depth_input_file_name[100];
 
@@ -266,7 +325,7 @@ int main()
 	FILE *wh_input, *wh_output;
 	int pixel_w, pixel_h;
 
-	Mat color_input, depth_input;
+	Mat color_input, depth_input, background_color, background_depth;
 	Mat color_output, depth_output;
 
 	//sprintf(wh_file_input, "%sresolutions.txt", depth_input_dir);
@@ -276,7 +335,7 @@ int main()
 
 	for (int i = 0; i < 12; i++)
 	{
-		// ����
+		// 读入
 		printf("%d\n", i);
 		//fscanf(wh_input, "%d %d\n", &pixel_w, &pixel_h);
 
@@ -284,14 +343,21 @@ int main()
 		sprintf(depth_input_file_name, "%s%d.png", depth_input_dir, i);
 		color_input = imread(color_input_file_name, 1);
 		depth_input = imread(depth_input_file_name, 0);
-		color_output = color_input.clone();
-		depth_output = depth_input.clone();
+
+		sprintf(color_input_file_name, "%s%d.png", color_background_dir, i);
+		sprintf(depth_input_file_name, "%s%d.png", depth_background_dir, i);
+		background_color = imread(color_input_file_name, 1);
+		background_depth = imread(depth_input_file_name, 0);
 
 		fprintf(wh_output, "%d %d\n", depth_input.cols, depth_input.rows);
 
+		background_replace(color_input, depth_input, background_color, background_depth);
+
+		color_output = color_input.clone();
+		depth_output = depth_input.clone();
 		denoise(color_input, depth_input, depth_output, i);
 
-		// ���
+		// 输出
 		//sprintf(color_output_file_name, "%s%d.png", color_output_dir, i);
 		sprintf(depth_output_file_name, "%s%d.png", depth_output_dir, i);
 		//imwrite(color_output_file_name, color_output);

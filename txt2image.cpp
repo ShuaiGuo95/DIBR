@@ -15,10 +15,10 @@ int main()
 {
 	int height, width, x;
 	char tempchar;
-	int height1 = 1082, height3 = 1082;
-	int width1 = 1938, width3 = 1938;
-	char inputname[20][50] = { "hlabel1.txt", "hlabel3.txt", "hrange1.txt", "hrange3.txt", "mdepth1.txt", "mdepth3.txt", "mlabel1.txt", "mlabel3.txt", "out_buf_depth.txt", "warp1.txt", "warp3.txt"};
-	char outputname[20][50] = { "hlabel1.png", "hlabel3.png", "hrange1.png", "hrange3.png", "mdepth1.png", "mdepth3.png", "mlabel1.png", "mlabel3.png", "out_buf_depth.png", "warp1.png", "warp3.png"};
+	int height1 = 1080, height3 = 1080;
+	int width1 = 1920, width3 = 1920;
+	char inputname[20][50] = { "hlabel1.txt", "hlabel3.txt", "hrange1.txt", "hrange3.txt", "mdepth1.txt", "mdepth3.txt", "mlabel1.txt", "mlabel3.txt", "out_buf_depth.txt", "warp1.txt", "warp3.txt" };
+	char outputname[20][50] = { "hlabel1.png", "hlabel3.png", "hrange1.png", "hrange3.png", "mdepth1.png", "mdepth3.png", "mlabel1.png", "mlabel3.png", "out_buf_depth.png", "warp1.png", "warp3.png" };
 	//int heights[10] = { 1080, 1080, 1080, 1080, 1080, 1080, 1080, 1080, 1080 };
 	//int widths[10] = { 1920, 1920, 1920, 1920, 1920, 1920, 1920, 1920, 1920 };
 	int heights[20] = { height1, height3, height1, height3, max(height1, height3), max(height1, height3), max(height1, height3), max(height1, height3), max(height1, height3), max(height1, height3), max(height1, height3) };

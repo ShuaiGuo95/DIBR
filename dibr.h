@@ -262,8 +262,8 @@ int set_sfm_parameters(float* save_data)
 
 	//gs begin add
 	FILE *fp = NULL, *tp = NULL;
-	fp = fopen("para_cameras_1004_diff_noresize.txt", "r");
-	tp = fopen("./depth_1004_diff_noresize/minmaxdepth.txt", "r");
+	fp = fopen("para_cameras_100_0_366.txt", "r");
+	tp = fopen("./depth_100_0_366/minmaxdepth.txt", "r");
 	char temps[100];
 	int tempid;
 	for (int m = 0; m < CamNum; m++)
@@ -426,8 +426,8 @@ void label_background_boudary_pixels(float* range_img, novel_pixel_label_t* labe
 
 			if (fabs(grad_x) >= dthresh)
 			{
-				if (range_img[y * width + rx] >= maxdepth - 0.05 &&  range_img[y * width + x] > 17) continue; // gs add 背景前景边界判断 疑似0的位置都跳过 稠密方案
-				if (range_img[y * width + x] >= maxdepth - 0.05 &&  range_img[y * width + rx] > 17) continue; // gs add 背景前景边界判断 疑似0的位置都跳过 稠密方案
+				//if (range_img[y * width + rx] >= maxdepth - 0.05 &&  range_img[y * width + x] > 17) continue; // gs add 背景前景边界判断 疑似0的位置都跳过 稠密方案
+				//if (range_img[y * width + x] >= maxdepth - 0.05 &&  range_img[y * width + rx] > 17) continue; // gs add 背景前景边界判断 疑似0的位置都跳过 稠密方案
 				//if (range_img[y * width + rx] >= maxdepth - 0.05) continue; // 稀疏方案
 
 				int sid = grad_x > 0.f ? 1 : -edge_radius;
@@ -442,8 +442,8 @@ void label_background_boudary_pixels(float* range_img, novel_pixel_label_t* labe
 			} // -- process horizontal gradients
 			if (fabs(grad_y) >= dthresh)
 			{
-				if (range_img[dy * width + x] >= maxdepth - 0.05 && range_img[y * width + x] > 17) continue; // gs add 背景前景边界判断 疑似0的位置都跳过 稠密方案
-				if (range_img[y * width + x] >= maxdepth - 0.05 && range_img[dy * width + x] > 17) continue; // gs add 背景前景边界判断 疑似0的位置都跳过 稠密方案
+				//if (range_img[dy * width + x] >= maxdepth - 0.05 && range_img[y * width + x] > 17) continue; // gs add 背景前景边界判断 疑似0的位置都跳过 稠密方案
+				//if (range_img[y * width + x] >= maxdepth - 0.05 && range_img[dy * width + x] > 17) continue; // gs add 背景前景边界判断 疑似0的位置都跳过 稠密方案
 				//if (range_img[dy * width + x] >= maxdepth - 0.05) continue; // 稀疏方案
 
 				int sid = grad_y > 0.f ? 1 : -edge_radius;
@@ -1527,7 +1527,7 @@ int gen_novel_view(krt_CamParam* ccam, unsigned char* bgra, float* range_img, kr
 
 	float maxdisp = fB / mindepth, mindisp = fB / maxdepth;
 	float drange = maxdisp - mindisp + 1;
-	const float dtr = 20*0.01666667f; // -- disparity threashold ratio  ???? gs add dtr 原本为 0.01666667f;
+	const float dtr = 5*0.01666667f; // -- disparity threashold ratio  ???? gs add dtr 原本为 0.01666667f;
 	const int edge_radius = 4; // -- the same as in the original paper   for 1080P is 4. 
 
 	/////!!!!!!!!!!!!!!!!!!!!!!!!!!!!! label_boundary_pixels is random !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2477,7 +2477,7 @@ void setVirCamParam(krt_CamParam* vcam, InputParameters* input, int width, int h
 	//vcam->lens_fov = 10;
 	//vcam->fisheye_radius = 2000;
 	FILE *fp = NULL;
-	fp = fopen("para_vcamera_1004_diff_noresize.txt", "r");
+	fp = fopen("para_vcamera_100_0_366.txt", "r");
 	char temps[100];
 	int tempid;
 
